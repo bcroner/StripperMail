@@ -1,0 +1,48 @@
+# ==============================================================================
+# StripperMail Universal Multi-Container Mail Stack Blueprint
+# License: MIT
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. SMTP Tier: High-Throughput Mail Routing & Filtering Engine (Postfix)
+  # ----------------------------------------------------------------------------
+  mail-mta:
+    image: mailserver/docker-mailserver:latest
+    container_name: stripper_mail_server
+    hostname: mail
+    domainname: ${SMTP_DOMAIN}
+    ports:
+      - "25:25"     # SMTP standard relay gate
+      - "143:143"   # IMAP standard gate
+      - "587:587"   # SMTP secure submission gate
+      - "993:993"   # IMAP secure SSL/TLS gate
+    environment:
+      - ENABLE_SPAMASSASSIN=1
+      - ENABLE_CLAMAV=0 # Keep it lean to minimize memory footprint
+      - ENABLE_FAIL2BAN=1 # Prevent automated brute-force reconnaissance
+      - SSL_TYPE=letsencrypt
+    volumes:
+      # Map directly to your CloudStripper Let's Encrypt certificate stores
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - mail_state_data:/var/mail
+      - mail_config_data:/tmp/docker-mailserver
+    networks:
+      - mail_isolated_net
+    restart: always
+
+# ------------------------------------------------------------------------------
+# Infrastructure Storage and Network Resource Isolation Gates
+# ------------------------------------------------------------------------------
+volumes:
+  # Ensures messages and metadata persist natively on bare-metal hardware
+  mail_state_data:
+    driver: local
+  mail_config_data:
+    driver: local
+
+networks:
+  mail_isolated_net:
+    driver: bridge
